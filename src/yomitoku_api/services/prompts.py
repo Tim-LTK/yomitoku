@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from yomitoku_api.config import Settings
+from yomitoku_api.constants import STUDENT_CONTEXT
 from yomitoku_api.exceptions import PromptNotFoundError
 from yomitoku_api.schemas import BreakdownElement, PracticeItem, SentenceBreakdown
 
