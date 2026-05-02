@@ -7,6 +7,9 @@ from pydantic import ValidationError
 from yomitoku_api.schemas import (
     AnalyseEnvelope,
     BreakdownElement,
+    PracticeEvaluateEnvelope,
+    PracticeGenerateEnvelope,
+    PracticeItem,
     RawOutput,
     SentenceBreakdown,
     ValidationIssue,
@@ -198,3 +201,67 @@ def validate_plain_extract_text(raw: RawOutput) -> ValidationResult:
             breakdowns=None,
         )
     return ValidationResult(is_valid=True, issues=[], breakdowns=None)
+
+
+def validate_practice_item_ids_unique(items: list[PracticeItem]) -> list[ValidationIssue]:
+    seen: set[str] = set()
+    issues: list[ValidationIssue] = []
+    for item in items:
+        if item.itemId in seen:
+            issues.append(
+                ValidationIssue(
+                    code="practice_item_id_duplicate",
+                    message=(
+                        f"Duplicate itemId {item.itemId!r} — regenerate with fresh unique ids "
+                        "per drill."
+                    ),
+                )
+            )
+        seen.add(item.itemId)
+    return issues
+
+
+def validate_practice_generation(raw: RawOutput) -> ValidationResult:
+    """Structural parse + uniqueness for practice minting responses."""
+
+    text = strip_code_fences(raw.raw_text)
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return ValidationResult(is_valid=False, issues=[issue_json_decode(exc)])
+
+    try:
+        envelope = PracticeGenerateEnvelope.model_validate(payload)
+    except ValidationError as exc:
+        return ValidationResult(
+            is_valid=False,
+            issues=issue_pydantic_validation(exc),
+        )
+
+    issues = validate_practice_item_ids_unique(envelope.items)
+    is_valid = len(issues) == 0
+    return ValidationResult(
+        is_valid=is_valid,
+        issues=issues,
+        practice_items=envelope.items if is_valid else None,
+    )
+
+
+def validate_practice_evaluation(raw: RawOutput) -> ValidationResult:
+    """Parse envelope wrapping `PracticeResult` for graded submissions."""
+
+    text = strip_code_fences(raw.raw_text)
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return ValidationResult(is_valid=False, issues=[issue_json_decode(exc)])
+
+    try:
+        envelope = PracticeEvaluateEnvelope.model_validate(payload)
+    except ValidationError as exc:
+        return ValidationResult(
+            is_valid=False,
+            issues=issue_pydantic_validation(exc),
+        )
+
+    return ValidationResult(is_valid=True, issues=[], practice_result=envelope.result)

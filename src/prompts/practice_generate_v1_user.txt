@@ -1,0 +1,4 @@
+SentenceBreakdown JSON (authoritative grounding):
+{SENTENCE_BREAKDOWN_JSON}
+
+Generate the practice items envelope now.

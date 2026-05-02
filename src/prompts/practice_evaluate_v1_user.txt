@@ -1,0 +1,12 @@
+SentenceBreakdown JSON:
+{SENTENCE_BREAKDOWN_JSON}
+
+practiceItem JSON:
+{PRACTICE_ITEM_JSON}
+
+userAnswer verbatim:
+<<<
+{USER_ANSWER}
+>>>
+
+Return the evaluate envelope JSON.

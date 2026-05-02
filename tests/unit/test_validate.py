@@ -128,3 +128,42 @@ def test_validate_breakdown_requires_ni_note() -> None:
     result = validate_service.validate_breakdown_generation(_raw_with_json(payload))
     assert not result.is_valid
     assert any(issue.code == "ni_missing_function_note" for issue in result.issues)
+
+
+def test_validate_practice_generation_accepts_minimal_payload() -> None:
+    payload = {
+        "items": [
+            {
+                "itemId": "pr_1_a",
+                "practiceType": "cloze_gap",
+                "prompt": "Blank the particle.",
+                "hint": None,
+            }
+        ]
+    }
+    result = validate_service.validate_practice_generation(_raw_with_json(payload))
+    assert result.is_valid
+    assert result.practice_items is not None
+    assert len(result.practice_items) == 1
+
+
+def test_validate_practice_generation_flags_duplicate_ids() -> None:
+    dup = {"itemId": "dup", "practiceType": "short_answer", "prompt": "Q1", "hint": None}
+    payload = {"items": [dup, dup]}
+    result = validate_service.validate_practice_generation(_raw_with_json(payload))
+    assert not result.is_valid
+    assert any(issue.code == "practice_item_id_duplicate" for issue in result.issues)
+
+
+def test_validate_practice_evaluation_accepts_envelope() -> None:
+    payload = {
+        "result": {
+            "qualityScore": 4,
+            "feedback": "Solid word order; double-check the particle nuance.",
+            "errorTags": ["particle"],
+        }
+    }
+    result = validate_service.validate_practice_evaluation(_raw_with_json(payload))
+    assert result.is_valid
+    assert result.practice_result is not None
+    assert result.practice_result.qualityScore == 4

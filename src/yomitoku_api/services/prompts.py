@@ -6,6 +6,7 @@ from pathlib import Path
 from yomitoku_api.config import Settings
 from yomitoku_api.constants import STUDENT_CONTEXT
 from yomitoku_api.exceptions import PromptNotFoundError
+from yomitoku_api.schemas import PracticeItem, SentenceBreakdown
 
 
 @dataclass(frozen=True)
@@ -48,4 +49,38 @@ def build_breakdown_analysis_bundle(settings: Settings, japanese_text: str) -> P
         system=system,
         user=user,
         prompt_versions={"breakdown_analysis": "v2"},
+    )
+
+
+def build_practice_generate_bundle(settings: Settings, breakdown: SentenceBreakdown) -> PromptBundle:
+    system = _inject_student_context(_read_utf8(settings, "practice_generate_v1_system.txt"))
+    user_template = _read_utf8(settings, "practice_generate_v1_user.txt")
+    sd_json = breakdown.model_dump_json()
+    user = _inject_student_context(user_template).replace("{SENTENCE_BREAKDOWN_JSON}", sd_json)
+    return PromptBundle(
+        system=system,
+        user=user,
+        prompt_versions={"practice_generate": "v1"},
+    )
+
+
+def build_practice_evaluate_bundle(
+    settings: Settings,
+    *,
+    breakdown: SentenceBreakdown,
+    practice_item: PracticeItem,
+    user_answer: str,
+) -> PromptBundle:
+    system = _inject_student_context(_read_utf8(settings, "practice_evaluate_v1_system.txt"))
+    user_template = _read_utf8(settings, "practice_evaluate_v1_user.txt")
+    injections = (
+        _inject_student_context(user_template)
+        .replace("{SENTENCE_BREAKDOWN_JSON}", breakdown.model_dump_json())
+        .replace("{PRACTICE_ITEM_JSON}", practice_item.model_dump_json())
+        .replace("{USER_ANSWER}", user_answer.strip())
+    )
+    return PromptBundle(
+        system=system,
+        user=injections,
+        prompt_versions={"practice_evaluate": "v1"},
     )
