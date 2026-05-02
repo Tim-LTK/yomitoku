@@ -167,3 +167,17 @@ def test_validate_practice_evaluation_accepts_envelope() -> None:
     assert result.is_valid
     assert result.practice_result is not None
     assert result.practice_result.qualityScore == 4
+
+
+def test_validate_explain_accepts_envelope() -> None:
+    payload = {
+        "explanation": {
+            "headline": "に as static location",
+            "detail": "Here に marks where the action takes place; pair it with a stative predicate.",
+            "commonPitfalls": "Do not confuse with に for time.",
+        }
+    }
+    result = validate_service.validate_explain_generation(_raw_with_json(payload))
+    assert result.is_valid
+    assert result.element_explanation is not None
+    assert result.element_explanation.headline.startswith("に")

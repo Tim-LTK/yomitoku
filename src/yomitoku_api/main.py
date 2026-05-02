@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from yomitoku_api.deps import get_settings_cached
 from yomitoku_api.exceptions import GenerationFailedError, MissingApiKeyError, PromptNotFoundError
-from yomitoku_api.routers import analyse, extract, practice
+from yomitoku_api.routers import analyse, explain, extract, practice
 from yomitoku_api.schemas import HealthResponse, ProblemDetail
 
 logger = logging.getLogger(__name__)
@@ -79,6 +79,7 @@ def create_application() -> FastAPI:
 
     app.include_router(extract.router)
     app.include_router(analyse.router)
+    app.include_router(explain.router)
     app.include_router(practice.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["meta"])

@@ -1,0 +1,9 @@
+Source sentence (Japanese, UTF-8):
+<<<
+{SOURCE_SENTENCE}
+>>>
+
+BreakdownElement JSON (trusted slice from prior analysis):
+{ELEMENT_JSON}
+
+Return the tutor envelope JSON described in the system prompt.

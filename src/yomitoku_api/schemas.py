@@ -52,6 +52,29 @@ class SentenceBreakdown(BaseModel):
     difficulty: JlptBand
 
 
+class ElementExplanation(BaseModel):
+    """AI tutor copy for exactly one surfaced token / span within a sentence."""
+
+    headline: Annotated[str, Field(min_length=1)]
+    detail: Annotated[str, Field(min_length=1)]
+    commonPitfalls: str | None = None
+
+
+class ExplainRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    breakdown_element: BreakdownElement = Field(alias="breakdownElement")
+    source_sentence: Annotated[str, Field(min_length=1, alias="sourceSentence")]
+
+
+class ExplainResponse(BaseModel):
+    explanation: ElementExplanation
+
+
+class ExplainEnvelope(BaseModel):
+    explanation: ElementExplanation
+
+
 PracticeErrorTag = Literal[
     "particle",
     "conjugation",
@@ -164,6 +187,7 @@ class ValidationResult(BaseModel):
     breakdowns: list[SentenceBreakdown] | None = None
     practice_items: list[PracticeItem] | None = None
     practice_result: PracticeResult | None = None
+    element_explanation: ElementExplanation | None = None
 
 
 class AnalyseEnvelope(BaseModel):

@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from yomitoku_api.config import Settings
-from yomitoku_api.constants import STUDENT_CONTEXT
 from yomitoku_api.exceptions import PromptNotFoundError
-from yomitoku_api.schemas import PracticeItem, SentenceBreakdown
+from yomitoku_api.schemas import BreakdownElement, PracticeItem, SentenceBreakdown
 
 
 @dataclass(frozen=True)
@@ -83,4 +82,24 @@ def build_practice_evaluate_bundle(
         system=system,
         user=injections,
         prompt_versions={"practice_evaluate": "v1"},
+    )
+
+
+def build_explain_element_bundle(
+    settings: Settings,
+    *,
+    element: BreakdownElement,
+    source_sentence: str,
+) -> PromptBundle:
+    system = _inject_student_context(_read_utf8(settings, "explain_element_v1_system.txt"))
+    template = _read_utf8(settings, "explain_element_v1_user.txt")
+    user = (
+        _inject_student_context(template)
+        .replace("{SOURCE_SENTENCE}", source_sentence.strip())
+        .replace("{ELEMENT_JSON}", element.model_dump_json())
+    )
+    return PromptBundle(
+        system=system,
+        user=user,
+        prompt_versions={"explain_element": "v1"},
     )
