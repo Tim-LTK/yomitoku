@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from yomitoku_api.schemas import (
     AnalyseEnvelope,
+    BreakdownElement,
     ExplainEnvelope,
     PracticeEvaluateEnvelope,
     PracticeGenerateEnvelope,
