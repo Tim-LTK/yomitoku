@@ -29,4 +29,4 @@ def post_extract(body: ExtractRequest, settings: Settings = SettingsDep) -> Extr
             detail=[issue.model_dump() for issue in validation.issues],
         )
     cleaned = validate_service.strip_code_fences(raw.raw_text).strip()
-    return ExtractResponse(extracted_text=cleaned)
+    return ExtractResponse(text=cleaned)

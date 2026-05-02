@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 GrammarRole = Literal[
     "topic_marker",
@@ -55,12 +55,17 @@ class SentenceBreakdown(BaseModel):
 class ExtractRequest(BaseModel):
     """Image bytes as base64; vision extraction runs in generation layer."""
 
-    image_base64: Annotated[str, Field(min_length=1)]
-    media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"] = "image/jpeg"
+    model_config = ConfigDict(populate_by_name=True)
+
+    image_base64: Annotated[str, Field(min_length=1, alias="imageBase64")]
+    media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"] = Field(
+        default="image/jpeg",
+        alias="mimeType",
+    )
 
 
 class ExtractResponse(BaseModel):
-    extracted_text: str
+    text: str
 
 
 class AnalyseRequest(BaseModel):
