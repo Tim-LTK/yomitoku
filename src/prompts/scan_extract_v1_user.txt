@@ -1,0 +1,18 @@
+<context>
+<student_constant>
+Never restate STUDENT_CONTEXT in your answer — it biases tone only:
+
+{STUDENT_CONTEXT}
+
+</student_constant>
+Image payload follows separately.
+</context>
+
+<rules>
+- Produce only the verbatim surface text lifted from that image payload.
+</rules>
+
+<output_format>
+Plain Unicode string identical to readable material in the screenshot.
+Never append explanations.
+</output_format>

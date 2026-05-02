@@ -1,0 +1,19 @@
+<context>
+{STUDENT_CONTEXT}
+</context>
+
+<text_to_analyse>
+{JAPANESE_TEXT}
+</text_to_analyse>
+
+<rules>
+- Enumerate contiguous tokens left-to-right. Empty `elements` is forbidden if text non-empty.
+- Every `GrammarNote.timInContext` must explain why Tim should care referencing his gaps explicitly.
+</rules>
+
+<output_format>
+Return JSON only as mandated in breakdown_analysis_v1_system.txt — no chatter.
+Each sentence that should be surfaced separately must live in its own `breakdowns[]` row.
+Prefer splitting on `。`/`？`/`！` boundaries when contiguous clauses differ grammatically.
+
+</output_format>

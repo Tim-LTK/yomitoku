@@ -1,0 +1,1 @@
+"""Yomitoku FastAPI application package."""
