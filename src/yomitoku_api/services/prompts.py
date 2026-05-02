@@ -41,11 +41,11 @@ def build_scan_extract_bundle(settings: Settings) -> PromptBundle:
 
 
 def build_breakdown_analysis_bundle(settings: Settings, japanese_text: str) -> PromptBundle:
-    system = _inject_student_context(_read_utf8(settings, "breakdown_analysis_v1_system.txt"))
-    user_template = _read_utf8(settings, "breakdown_analysis_v1_user.txt")
+    system = _inject_student_context(_read_utf8(settings, "breakdown_analysis_v2_system.txt"))
+    user_template = _read_utf8(settings, "breakdown_analysis_v2_user.txt")
     user = _inject_student_context(user_template).replace("{JAPANESE_TEXT}", japanese_text.strip())
     return PromptBundle(
         system=system,
         user=user,
-        prompt_versions={"breakdown_analysis": "v1"},
+        prompt_versions={"breakdown_analysis": "v2"},
     )

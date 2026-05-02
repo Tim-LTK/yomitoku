@@ -8,7 +8,7 @@ def _raw_with_json(payload: object) -> RawOutput:
     return RawOutput(
         raw_text=json.dumps(payload, ensure_ascii=False),
         model_id="pytest",
-        prompt_versions={"breakdown_analysis": "v1"},
+        prompt_versions={"breakdown_analysis": "v2"},
     )
 
 
