@@ -8,6 +8,7 @@ Judge along: vocabulary breadth, grammatical accuracy (including morphology), pa
 </evaluation_axes>
 
 <rules>
+- Any answer field whose value is an empty string means the learner explicitly skipped that prompt in the UI — interpret it as inability or unwillingness to produce the targeted pattern at that moment, not as harmless blank input to disregard.
 - Be concise in `notes` (2–6 sentences) summarizing evidence from the answers.
 - `weakAreas` and `knownGrammar` MUST be lowercase snake_case snippets (e.g. "particles_wa_ga", "te_form_polite").
 - `kanjiAdvantage` TRUE if learner demonstrably leverages kanji/Chinese characters confidently; FALSE otherwise.
