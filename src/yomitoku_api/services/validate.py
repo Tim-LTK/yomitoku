@@ -13,6 +13,7 @@ from yomitoku_api.schemas import (
     PracticeItem,
     RawOutput,
     SentenceBreakdown,
+    SrsComputeResponse,
     ValidationIssue,
     ValidationResult,
 )
@@ -266,6 +267,23 @@ def validate_practice_evaluation(raw: RawOutput) -> ValidationResult:
         )
 
     return ValidationResult(is_valid=True, issues=[], practice_result=envelope.result)
+
+
+def validate_srs_compute(raw: RawOutput) -> ValidationResult:
+    """Flat JSON `{ suggestedIntervalDays, nextReviewAt, reasoning }` from SRS compute prompts."""
+
+    text = strip_code_fences(raw.raw_text)
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return ValidationResult(is_valid=False, issues=[issue_json_decode(exc)])
+
+    try:
+        parsed = SrsComputeResponse.model_validate(payload)
+    except ValidationError as exc:
+        return ValidationResult(is_valid=False, issues=issue_pydantic_validation(exc))
+
+    return ValidationResult(is_valid=True, issues=[], srs_compute=parsed)
 
 
 def validate_explain_generation(raw: RawOutput) -> ValidationResult:

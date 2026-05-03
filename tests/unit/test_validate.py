@@ -169,6 +169,18 @@ def test_validate_practice_evaluation_accepts_envelope() -> None:
     assert result.practice_result.qualityScore == 4
 
 
+def test_validate_srs_compute_accepts_flat_payload() -> None:
+    payload = {
+        "suggestedIntervalDays": 4,
+        "nextReviewAt": "2026-06-07T09:30:00Z",
+        "reasoning": "Scores clustered at 3–4 without particle regressions → modest stretch.",
+    }
+    result = validate_service.validate_srs_compute(_raw_with_json(payload))
+    assert result.is_valid
+    assert result.srs_compute is not None
+    assert result.srs_compute.suggestedIntervalDays == 4
+
+
 def test_validate_explain_accepts_envelope() -> None:
     payload = {
         "explanation": {

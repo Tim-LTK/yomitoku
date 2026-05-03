@@ -1,0 +1,7 @@
+Knowledge gap snapshot (canonical `KnowledgeGap` JSON):
+{GAP_JSON}
+
+Chronological practice history (same order as learner attempts — each item aligns with Phase 2 `PracticeResult`):
+{PRACTICE_HISTORY_JSON}
+
+Return the JSON object described in the system message.

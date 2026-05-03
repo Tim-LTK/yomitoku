@@ -1,12 +1,19 @@
 """Prompt layer — loads versioned `.txt` files and injects `STUDENT_CONTEXT`."""
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
 from yomitoku_api.config import Settings
 from yomitoku_api.constants import STUDENT_CONTEXT
 from yomitoku_api.exceptions import PromptNotFoundError
-from yomitoku_api.schemas import BreakdownElement, PracticeItem, SentenceBreakdown
+from yomitoku_api.schemas import (
+    BreakdownElement,
+    KnowledgeGap,
+    PracticeItem,
+    PracticeResult,
+    SentenceBreakdown,
+)
 
 
 @dataclass(frozen=True)
@@ -103,4 +110,30 @@ def build_explain_element_bundle(
         system=system,
         user=user,
         prompt_versions={"explain_element": "v1"},
+    )
+
+
+def build_srs_compute_bundle(
+    settings: Settings,
+    *,
+    gap: KnowledgeGap,
+    results: list[PracticeResult],
+) -> PromptBundle:
+    """Spacing hint from gap + chronological practice grades."""
+
+    system = _inject_student_context(_read_utf8(settings, "srs_compute_v1_system.txt"))
+    template = _read_utf8(settings, "srs_compute_v1_user.txt")
+    history_json = json.dumps(
+        [r.model_dump(mode="json") for r in results],
+        ensure_ascii=False,
+    )
+    user = (
+        _inject_student_context(template)
+        .replace("{GAP_JSON}", gap.model_dump_json())
+        .replace("{PRACTICE_HISTORY_JSON}", history_json)
+    )
+    return PromptBundle(
+        system=system,
+        user=user,
+        prompt_versions={"srs_compute": "v1"},
     )

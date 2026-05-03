@@ -32,6 +32,9 @@ class Settings(BaseSettings):
         validation_alias="ALLOWED_ORIGINS",
     )
 
+    supabase_url: str | None = Field(default=None, validation_alias="SUPABASE_URL")
+    supabase_anon_key: str | None = Field(default=None, validation_alias="SUPABASE_ANON_KEY")
+
     @property
     def allowed_origins(self) -> list[str]:
         """Comma-separated browser origins for CORS; empty denies cross-origin callers."""

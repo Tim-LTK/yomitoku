@@ -1,5 +1,7 @@
 """Pydantic request / response and domain shapes — Phase 1 breakdown + Phase 2 practice."""
 
+from __future__ import annotations
+
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -174,6 +176,56 @@ class RawOutput(BaseModel):
     prompt_versions: dict[str, str]
 
 
+class KnowledgeGap(BaseModel):
+    """Learner-flagged weak spot — aligns with RN `KnowledgeGap`."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Annotated[str, Field(min_length=8)]
+    createdAtIso: Annotated[str, Field(min_length=1)]
+    breakdownRouteId: Annotated[str, Field(min_length=1)]
+    sentenceIndex: Annotated[int, Field(ge=0)]
+    sourceSentence: Annotated[str, Field(min_length=1)]
+    element: BreakdownElement
+    explanationSnapshot: ElementExplanation
+
+
+class KnowledgeGapPartial(BaseModel):
+    """Sparse PATCH merge for SRS gap rows."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    createdAtIso: str | None = None
+    breakdownRouteId: str | None = None
+    sentenceIndex: int | None = Field(None, ge=0)
+    sourceSentence: str | None = None
+    element: BreakdownElement | None = None
+    explanationSnapshot: ElementExplanation | None = None
+
+
+class SrsComputeRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    gap: KnowledgeGap
+    results: Annotated[list[PracticeResult], Field(min_length=1)]
+
+
+class SrsComputeResponse(BaseModel):
+    """Claude-guided spacing — serialised verbatim to callers."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    suggestedIntervalDays: Annotated[int, Field(ge=1, le=366)]
+    nextReviewAt: Annotated[str, Field(min_length=1)]
+    reasoning: Annotated[str, Field(min_length=1)]
+
+
+class SrsComputeEnvelope(BaseModel):
+    suggestedIntervalDays: Annotated[int, Field(ge=1, le=366)]
+    nextReviewAt: Annotated[str, Field(min_length=1)]
+    reasoning: Annotated[str, Field(min_length=1)]
+
+
 class ValidationIssue(BaseModel):
     code: str
     message: str
@@ -188,6 +240,7 @@ class ValidationResult(BaseModel):
     practice_items: list[PracticeItem] | None = None
     practice_result: PracticeResult | None = None
     element_explanation: ElementExplanation | None = None
+    srs_compute: SrsComputeResponse | None = None
 
 
 class AnalyseEnvelope(BaseModel):
