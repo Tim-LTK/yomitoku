@@ -188,6 +188,8 @@ class KnowledgeGap(BaseModel):
     sourceSentence: Annotated[str, Field(min_length=1)]
     element: BreakdownElement
     explanationSnapshot: ElementExplanation
+    nextReviewAt: str | None = None
+    intervalDays: Annotated[int | None, Field(default=None, ge=1, le=366)] = None
 
 
 class KnowledgeGapPartial(BaseModel):
@@ -201,6 +203,8 @@ class KnowledgeGapPartial(BaseModel):
     sourceSentence: str | None = None
     element: BreakdownElement | None = None
     explanationSnapshot: ElementExplanation | None = None
+    nextReviewAt: str | None = None
+    intervalDays: Annotated[int | None, Field(default=None, ge=1, le=366)] = None
 
 
 class SrsComputeRequest(BaseModel):
