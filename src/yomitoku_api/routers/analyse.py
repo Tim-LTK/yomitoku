@@ -9,7 +9,6 @@ from yomitoku_api.deps import get_settings_cached
 from yomitoku_api.schemas import AnalyseRequest, AnalyseResponse
 from yomitoku_api.services import analyse as analyse_gen
 from yomitoku_api.services import prompts as prompt_service
-from yomitoku_api.services import validate as validate_service
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +23,11 @@ SettingsDep = Depends(get_settings_cached)
 )
 def post_analyse(body: AnalyseRequest, settings: Settings = SettingsDep) -> AnalyseResponse:
     student_context = prompt_service.resolve_request_student_context(body.student_context)
-    bundle = prompt_service.build_breakdown_analysis_bundle(
+    validation = analyse_gen.run_chunked_sentence_breakdown_analysis(
         settings,
         body.text.strip(),
         student_context=student_context,
     )
-    raw = analyse_gen.generate_sentence_breakdowns(settings, bundle)
-    validation = validate_service.validate_breakdown_generation(raw)
     if not validation.is_valid or validation.breakdowns is None:
         logger.info(
             "validation.failed",

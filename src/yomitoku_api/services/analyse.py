@@ -1,16 +1,62 @@
-"""Generation layer for text-only grammar breakdown — returns `RawOutput` only."""
+"""Grammar breakdown generation — Claude `RawOutput` plus chunked analyse orchestration."""
 
 import logging
+import re
 from typing import Any
 
 import anthropic
 
 from yomitoku_api.config import Settings
 from yomitoku_api.exceptions import GenerationFailedError, MissingApiKeyError
-from yomitoku_api.schemas import RawOutput
+from yomitoku_api.schemas import RawOutput, SentenceBreakdown, ValidationIssue, ValidationResult
+from yomitoku_api.services import prompts as prompt_service
+from yomitoku_api.services import validate as validate_service
 from yomitoku_api.services.prompts import PromptBundle
 
 logger = logging.getLogger(__name__)
+
+_CHUNK_SENT_BOUNDARY_RE = re.compile(r"(?<=[。！？])")
+
+_MAX_SENTENCES_PER_CHUNK_DEFAULT = 3
+
+
+def chunk_japanese_text_for_analysis(
+    japanese_text: str,
+    *,
+    max_sentences_per_chunk: int = _MAX_SENTENCES_PER_CHUNK_DEFAULT,
+) -> list[str]:
+    """Split prose on sentence-final punctuation then group up to N sentences per API chunk."""
+
+    text = japanese_text.strip()
+    if not text:
+        return []
+    fragments = [
+        fragment.strip()
+        for fragment in _CHUNK_SENT_BOUNDARY_RE.split(text)
+        if fragment.strip()
+    ]
+    if not fragments:
+        return [text]
+
+    chunks: list[str] = []
+    bucket: list[str] = []
+
+    def flush_bucket() -> None:
+        if bucket:
+            joined = "".join(bucket).strip()
+            if joined:
+                chunks.append(joined)
+            bucket.clear()
+
+    for fragment in fragments:
+        bucket.append(fragment)
+        if len(bucket) >= max_sentences_per_chunk:
+            flush_bucket()
+
+    flush_bucket()
+
+    out = [c.strip() for c in chunks if c.strip()]
+    return out if out else [text]
 
 
 def _assistant_text_from_message(message: Any) -> str:
@@ -51,3 +97,55 @@ def generate_sentence_breakdowns(settings: Settings, bundle: PromptBundle) -> Ra
         model_id=settings.anthropic_model,
         prompt_versions=dict(bundle.prompt_versions),
     )
+
+
+def run_chunked_sentence_breakdown_analysis(
+    settings: Settings,
+    japanese_text: str,
+    *,
+    student_context: str,
+) -> ValidationResult:
+    """Splits long input into sentence groups, validates each Claude reply, merges breakdowns."""
+
+    chunks = chunk_japanese_text_for_analysis(japanese_text)
+    merged: list[SentenceBreakdown] = []
+    all_issues: list[ValidationIssue] = []
+
+    logger.info(
+        "analyse.chunked_plan",
+        extra={"segment_count": len(chunks)},
+    )
+
+    for idx, chunk in enumerate(chunks):
+        bundle = prompt_service.build_breakdown_analysis_bundle(
+            settings,
+            chunk,
+            student_context=student_context,
+        )
+        raw = generate_sentence_breakdowns(settings, bundle)
+        validation = validate_service.validate_breakdown_generation(raw)
+
+        if not validation.is_valid or validation.breakdowns is None:
+            all_issues.extend(
+                ValidationIssue(
+                    code=i.code,
+                    message=f"chunk[{idx}]: {i.message}",
+                )
+                for i in validation.issues
+            )
+            continue
+
+        merged.extend(validation.breakdowns)
+
+    if all_issues:
+        logger.info(
+            "analyse.chunked_validation_failure",
+            extra={"issue_count": len(all_issues)},
+        )
+        return ValidationResult(
+            is_valid=False,
+            issues=all_issues,
+            breakdowns=None,
+        )
+
+    return ValidationResult(is_valid=True, issues=[], breakdowns=merged)
