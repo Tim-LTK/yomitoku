@@ -1,0 +1,10 @@
+Native languages JSON array:
+{NATIVE_LANGS_JSON}
+
+Self-reported JLPT-ish level label:
+{SELF_REPORTED_LEVEL}
+
+Five onboarding answers JSON object (keys q1–q5):
+{ANSWERS_JSON}
+
+Produce the structured profile JSON described in the system prompt.

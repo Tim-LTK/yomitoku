@@ -67,6 +67,7 @@ class ExplainRequest(BaseModel):
 
     breakdown_element: BreakdownElement = Field(alias="breakdownElement")
     source_sentence: Annotated[str, Field(min_length=1, alias="sourceSentence")]
+    student_context: str | None = Field(default=None, alias="studentContext")
 
 
 class ExplainResponse(BaseModel):
@@ -112,6 +113,7 @@ class PracticeGenerateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     sentence_breakdown: SentenceBreakdown = Field(alias="sentenceBreakdown")
+    student_context: str | None = Field(default=None, alias="studentContext")
 
 
 class PracticeGenerateResponse(BaseModel):
@@ -126,6 +128,7 @@ class PracticeEvaluateRequest(BaseModel):
     sentence_breakdown: SentenceBreakdown = Field(alias="sentenceBreakdown")
     practice_item: PracticeItem = Field(alias="practiceItem")
     user_answer: Annotated[str, Field(min_length=1, alias="userAnswer")]
+    student_context: str | None = Field(default=None, alias="studentContext")
 
 
 class PracticeEvaluateResponse(BaseModel):
@@ -142,6 +145,7 @@ class ExtractRequest(BaseModel):
         default="image/jpeg",
         alias="mimeType",
     )
+    student_context: str | None = Field(default=None, alias="studentContext")
 
 
 class ExtractResponse(BaseModel):
@@ -150,6 +154,7 @@ class ExtractResponse(BaseModel):
 
 class AnalyseRequest(BaseModel):
     text: Annotated[str, Field(min_length=1)]
+    student_context: str | None = Field(default=None, alias="studentContext")
 
 
 class AnalyseResponse(BaseModel):
@@ -212,6 +217,62 @@ class SrsComputeRequest(BaseModel):
 
     gap: KnowledgeGap
     results: Annotated[list[PracticeResult], Field(min_length=1)]
+    student_context: str | None = Field(default=None, alias="studentContext")
+
+
+class OnboardingAnswers(BaseModel):
+    """Five free-text placement answers keyed q1–q5."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    q1: Annotated[str, Field(min_length=1)]
+    q2: Annotated[str, Field(min_length=1)]
+    q3: Annotated[str, Field(min_length=1)]
+    q4: Annotated[str, Field(min_length=1)]
+    q5: Annotated[str, Field(min_length=1)]
+
+
+class OnboardingAssessRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    native_languages: Annotated[list[str], Field(min_length=1, alias="nativeLanguages")]
+    self_reported_level: Annotated[str, Field(min_length=1, alias="selfReportedLevel")]
+    answers: OnboardingAnswers
+    student_context: str | None = Field(default=None, alias="studentContext")
+
+
+class OnboardingAssessEnvelope(BaseModel):
+    """Claude onboarding JSON — timestamps added server-side into `StudentProfile`."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    target_language: str = Field(default="japanese", alias="targetLanguage")
+    native_languages: Annotated[list[str], Field(min_length=1, alias="nativeLanguages")]
+    self_reported_level: Annotated[str, Field(min_length=1, alias="selfReportedLevel")]
+    assessed_level: Annotated[str, Field(min_length=1, alias="assessedLevel")]
+    kanji_advantage: bool = Field(alias="kanjiAdvantage")
+    listening_gap: bool = Field(alias="listeningGap")
+    weak_areas: list[str] = Field(alias="weakAreas")
+    known_grammar: list[str] = Field(alias="knownGrammar")
+    notes: Annotated[str, Field(min_length=1)]
+
+
+class StudentProfile(BaseModel):
+    """Structured learner fingerprint returned from `/onboard/assess`."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    target_language: str = Field(default="japanese", alias="targetLanguage")
+    native_languages: Annotated[list[str], Field(min_length=1, alias="nativeLanguages")]
+    self_reported_level: Annotated[str, Field(min_length=1, alias="selfReportedLevel")]
+    assessed_level: Annotated[str, Field(min_length=1, alias="assessedLevel")]
+    kanji_advantage: bool = Field(alias="kanjiAdvantage")
+    listening_gap: bool = Field(alias="listeningGap")
+    weak_areas: list[str] = Field(alias="weakAreas")
+    known_grammar: list[str] = Field(alias="knownGrammar")
+    notes: Annotated[str, Field(min_length=1)]
+    created_at: Annotated[str, Field(min_length=1, alias="createdAt")]
+    updated_at: Annotated[str, Field(min_length=1, alias="updatedAt")]
 
 
 class SrsComputeResponse(BaseModel):
@@ -245,6 +306,7 @@ class ValidationResult(BaseModel):
     practice_result: PracticeResult | None = None
     element_explanation: ElementExplanation | None = None
     srs_compute: SrsComputeResponse | None = None
+    student_profile: StudentProfile | None = None
 
 
 class AnalyseEnvelope(BaseModel):

@@ -15,7 +15,8 @@ SettingsDep = Depends(get_settings_cached)
 
 @router.post("", response_model=ExtractResponse, summary="Image → plaintext Japanese")
 def post_extract(body: ExtractRequest, settings: Settings = SettingsDep) -> ExtractResponse:
-    bundle = prompt_service.build_scan_extract_bundle(settings)
+    student_context = prompt_service.resolve_request_student_context(body.student_context)
+    bundle = prompt_service.build_scan_extract_bundle(settings, student_context=student_context)
     raw = extract_gen.generate_text_from_image(
         settings,
         bundle,

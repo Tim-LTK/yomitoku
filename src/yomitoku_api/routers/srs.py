@@ -120,10 +120,12 @@ def compute_schedule_route(
     body: SrsComputeRequest,
     settings: Settings = SettingsDep,
 ) -> SrsComputeResponse:
+    student_context = prompt_service.resolve_request_student_context(body.student_context)
     bundle = prompt_service.build_srs_compute_bundle(
         settings,
         gap=body.gap,
         results=body.results,
+        student_context=student_context,
     )
     raw = srs_compute_gen.generate_srs_schedule(settings, bundle)
     validation = validate_service.validate_srs_compute(raw)

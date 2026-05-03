@@ -31,7 +31,12 @@ def post_practice_generate(
     body: PracticeGenerateRequest,
     settings: Settings = SettingsDep,
 ) -> PracticeGenerateResponse:
-    bundle = prompt_service.build_practice_generate_bundle(settings, body.sentence_breakdown)
+    student_context = prompt_service.resolve_request_student_context(body.student_context)
+    bundle = prompt_service.build_practice_generate_bundle(
+        settings,
+        body.sentence_breakdown,
+        student_context=student_context,
+    )
     raw = practice_gen.generate_practice_items(settings, bundle)
     validation = validate_service.validate_practice_generation(raw)
     if not validation.is_valid or validation.practice_items is None:
@@ -55,11 +60,13 @@ def post_practice_evaluate(
     body: PracticeEvaluateRequest,
     settings: Settings = SettingsDep,
 ) -> PracticeEvaluateResponse:
+    student_context = prompt_service.resolve_request_student_context(body.student_context)
     bundle = prompt_service.build_practice_evaluate_bundle(
         settings,
         breakdown=body.sentence_breakdown,
         practice_item=body.practice_item,
         user_answer=body.user_answer,
+        student_context=student_context,
     )
     raw = practice_gen.evaluate_practice_attempt(settings, bundle)
     validation = validate_service.validate_practice_evaluation(raw)

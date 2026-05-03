@@ -23,10 +23,12 @@ SettingsDep = Depends(get_settings_cached)
     summary="Explain one Breakdown element grounded on the source sentence",
 )
 def post_explain(body: ExplainRequest, settings: Settings = SettingsDep) -> ExplainResponse:
+    student_context = prompt_service.resolve_request_student_context(body.student_context)
     bundle = prompt_service.build_explain_element_bundle(
         settings,
         element=body.breakdown_element,
         source_sentence=body.source_sentence.strip(),
+        student_context=student_context,
     )
     raw = explain_gen.generate_element_explanation(settings, bundle)
     validation = validate_service.validate_explain_generation(raw)

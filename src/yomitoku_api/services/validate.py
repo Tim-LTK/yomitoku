@@ -1,6 +1,7 @@
 """Validation layer — discrete checks aggregated into `ValidationResult` objects."""
 
 import json
+from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
@@ -8,12 +9,14 @@ from yomitoku_api.schemas import (
     AnalyseEnvelope,
     BreakdownElement,
     ExplainEnvelope,
+    OnboardingAssessEnvelope,
     PracticeEvaluateEnvelope,
     PracticeGenerateEnvelope,
     PracticeItem,
     RawOutput,
     SentenceBreakdown,
     SrsComputeResponse,
+    StudentProfile,
     ValidationIssue,
     ValidationResult,
 )
@@ -267,6 +270,38 @@ def validate_practice_evaluation(raw: RawOutput) -> ValidationResult:
         )
 
     return ValidationResult(is_valid=True, issues=[], practice_result=envelope.result)
+
+
+def _utc_assessment_stamp() -> str:
+    stamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return stamp.replace("+00:00", "Z")
+
+
+def validate_onboarding_assessment(raw: RawOutput) -> ValidationResult:
+    """Parse Claude onboarding envelope and stamp deterministic server timestamps."""
+
+    text = strip_code_fences(raw.raw_text)
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return ValidationResult(is_valid=False, issues=[issue_json_decode(exc)])
+
+    try:
+        envelope = OnboardingAssessEnvelope.model_validate(payload)
+    except ValidationError as exc:
+        return ValidationResult(is_valid=False, issues=issue_pydantic_validation(exc))
+
+    stamped = envelope.model_dump(mode="python", by_alias=True)
+    ts = _utc_assessment_stamp()
+    stamped["createdAt"] = ts
+    stamped["updatedAt"] = ts
+
+    try:
+        profile = StudentProfile.model_validate(stamped)
+    except ValidationError as exc:
+        return ValidationResult(is_valid=False, issues=issue_pydantic_validation(exc))
+
+    return ValidationResult(is_valid=True, issues=[], student_profile=profile)
 
 
 def validate_srs_compute(raw: RawOutput) -> ValidationResult:

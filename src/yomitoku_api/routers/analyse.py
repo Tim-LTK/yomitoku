@@ -23,7 +23,12 @@ SettingsDep = Depends(get_settings_cached)
     summary="Morphological + grammar-role breakdown",
 )
 def post_analyse(body: AnalyseRequest, settings: Settings = SettingsDep) -> AnalyseResponse:
-    bundle = prompt_service.build_breakdown_analysis_bundle(settings, body.text.strip())
+    student_context = prompt_service.resolve_request_student_context(body.student_context)
+    bundle = prompt_service.build_breakdown_analysis_bundle(
+        settings,
+        body.text.strip(),
+        student_context=student_context,
+    )
     raw = analyse_gen.generate_sentence_breakdowns(settings, bundle)
     validation = validate_service.validate_breakdown_generation(raw)
     if not validation.is_valid or validation.breakdowns is None:

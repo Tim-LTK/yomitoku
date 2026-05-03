@@ -9,7 +9,7 @@ from yomitoku_api.constants import DEFAULT_ANTHROPIC_MODEL
 
 
 def _src_root() -> Path:
-    """`src/` — prompt files live in `src/prompts/` per project rules."""
+    """`src/` — prompt files live in `src/prompts/<language>/`."""
 
     return Path(__file__).resolve().parents[1]
 

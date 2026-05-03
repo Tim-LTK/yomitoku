@@ -1,11 +1,9 @@
-"""Prompt layer — loads versioned `.txt` files and injects `STUDENT_CONTEXT`."""
+"""Prompt layer — language-namespaced `prompts/<lang>/` files plus `{STUDENT_CONTEXT}` injection."""
 
 import json
 from dataclasses import dataclass
-from pathlib import Path
 
 from yomitoku_api.config import Settings
-from yomitoku_api.constants import STUDENT_CONTEXT
 from yomitoku_api.exceptions import PromptNotFoundError
 from yomitoku_api.schemas import (
     BreakdownElement,
@@ -14,6 +12,36 @@ from yomitoku_api.schemas import (
     PracticeResult,
     SentenceBreakdown,
 )
+
+_LANGUAGE_JAPANESE = "japanese"
+_DEFAULT_FALLBACK_CTX = "Student: Japanese language learner. No profile available."
+
+
+def build_student_context(profile: dict) -> str:
+    """Flatten a persisted learner-profile dict into a deterministic multi-line string."""
+
+    if not isinstance(profile, dict):
+        raise TypeError("profile must be a mapping")
+    chunks: list[str] = []
+    for key in sorted(profile.keys(), key=str):
+        value = profile[key]
+        label = key if isinstance(key, str) else str(key)
+        if isinstance(value, (list, tuple)):
+            chunks.append(f"{label}: {', '.join(str(item) for item in value)}")
+        elif isinstance(value, dict):
+            chunks.append(f"{label}: {json.dumps(value, ensure_ascii=False)}")
+        elif isinstance(value, bool):
+            chunks.append(f"{label}: {'yes' if value else 'no'}")
+        else:
+            chunks.append(f"{label}: {value}")
+    return "\n".join(chunks).strip()
+
+
+def resolve_request_student_context(explicit_body_field: str | None) -> str:
+    """Per-request Claude tone anchor — honours client `studentContext` or benign default."""
+
+    text = (explicit_body_field or "").strip()
+    return text if text else _DEFAULT_FALLBACK_CTX
 
 
 @dataclass(frozen=True)
@@ -25,22 +53,32 @@ class PromptBundle:
     prompt_versions: dict[str, str]
 
 
-def _read_utf8(settings: Settings, filename: str) -> str:
-    path: Path = settings.prompts_dir / filename
+def _prompt_path(fragment: str) -> str:
+    return f"{_LANGUAGE_JAPANESE}/{fragment}"
+
+
+def _read_utf8(settings: Settings, fragment: str) -> str:
+    path = settings.prompts_dir / fragment
     if not path.is_file():
-        raise PromptNotFoundError(filename)
+        raise PromptNotFoundError(fragment)
     return path.read_text(encoding="utf-8")
 
 
-def _inject_student_context(fragment: str) -> str:
+def _inject_student_context(fragment: str, *, student_context: str) -> str:
     """Replace template token `{STUDENT_CONTEXT}` wherever prompt authors placed it."""
 
-    return fragment.replace("{STUDENT_CONTEXT}", STUDENT_CONTEXT)
+    return fragment.replace("{STUDENT_CONTEXT}", student_context)
 
 
-def build_scan_extract_bundle(settings: Settings) -> PromptBundle:
-    system = _inject_student_context(_read_utf8(settings, "scan_extract_v1_system.txt"))
-    user = _inject_student_context(_read_utf8(settings, "scan_extract_v1_user.txt"))
+def build_scan_extract_bundle(settings: Settings, *, student_context: str) -> PromptBundle:
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("scan_extract_v1_system.txt")),
+        student_context=student_context,
+    )
+    user = _inject_student_context(
+        _read_utf8(settings, _prompt_path("scan_extract_v1_user.txt")),
+        student_context=student_context,
+    )
     return PromptBundle(
         system=system,
         user=user,
@@ -48,10 +86,20 @@ def build_scan_extract_bundle(settings: Settings) -> PromptBundle:
     )
 
 
-def build_breakdown_analysis_bundle(settings: Settings, japanese_text: str) -> PromptBundle:
-    system = _inject_student_context(_read_utf8(settings, "breakdown_analysis_v3_system.txt"))
-    user_template = _read_utf8(settings, "breakdown_analysis_v3_user.txt")
-    user = _inject_student_context(user_template).replace("{JAPANESE_TEXT}", japanese_text.strip())
+def build_breakdown_analysis_bundle(
+    settings: Settings,
+    japanese_text: str,
+    *,
+    student_context: str,
+) -> PromptBundle:
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("breakdown_analysis_v3_system.txt")),
+        student_context=student_context,
+    )
+    user_template = _read_utf8(settings, _prompt_path("breakdown_analysis_v3_user.txt"))
+    user = _inject_student_context(user_template, student_context=student_context).replace(
+        "{JAPANESE_TEXT}", japanese_text.strip()
+    )
     return PromptBundle(
         system=system,
         user=user,
@@ -59,11 +107,21 @@ def build_breakdown_analysis_bundle(settings: Settings, japanese_text: str) -> P
     )
 
 
-def build_practice_generate_bundle(settings: Settings, breakdown: SentenceBreakdown) -> PromptBundle:
-    system = _inject_student_context(_read_utf8(settings, "practice_generate_v1_system.txt"))
-    user_template = _read_utf8(settings, "practice_generate_v1_user.txt")
+def build_practice_generate_bundle(
+    settings: Settings,
+    breakdown: SentenceBreakdown,
+    *,
+    student_context: str,
+) -> PromptBundle:
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("practice_generate_v1_system.txt")),
+        student_context=student_context,
+    )
+    user_template = _read_utf8(settings, _prompt_path("practice_generate_v1_user.txt"))
     sd_json = breakdown.model_dump_json()
-    user = _inject_student_context(user_template).replace("{SENTENCE_BREAKDOWN_JSON}", sd_json)
+    user = _inject_student_context(user_template, student_context=student_context).replace(
+        "{SENTENCE_BREAKDOWN_JSON}", sd_json
+    )
     return PromptBundle(
         system=system,
         user=user,
@@ -77,11 +135,15 @@ def build_practice_evaluate_bundle(
     breakdown: SentenceBreakdown,
     practice_item: PracticeItem,
     user_answer: str,
+    student_context: str,
 ) -> PromptBundle:
-    system = _inject_student_context(_read_utf8(settings, "practice_evaluate_v1_system.txt"))
-    user_template = _read_utf8(settings, "practice_evaluate_v1_user.txt")
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("practice_evaluate_v1_system.txt")),
+        student_context=student_context,
+    )
+    user_template = _read_utf8(settings, _prompt_path("practice_evaluate_v1_user.txt"))
     injections = (
-        _inject_student_context(user_template)
+        _inject_student_context(user_template, student_context=student_context)
         .replace("{SENTENCE_BREAKDOWN_JSON}", breakdown.model_dump_json())
         .replace("{PRACTICE_ITEM_JSON}", practice_item.model_dump_json())
         .replace("{USER_ANSWER}", user_answer.strip())
@@ -98,11 +160,15 @@ def build_explain_element_bundle(
     *,
     element: BreakdownElement,
     source_sentence: str,
+    student_context: str,
 ) -> PromptBundle:
-    system = _inject_student_context(_read_utf8(settings, "explain_element_v1_system.txt"))
-    template = _read_utf8(settings, "explain_element_v1_user.txt")
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("explain_element_v1_system.txt")),
+        student_context=student_context,
+    )
+    template = _read_utf8(settings, _prompt_path("explain_element_v1_user.txt"))
     user = (
-        _inject_student_context(template)
+        _inject_student_context(template, student_context=student_context)
         .replace("{SOURCE_SENTENCE}", source_sentence.strip())
         .replace("{ELEMENT_JSON}", element.model_dump_json())
     )
@@ -118,17 +184,21 @@ def build_srs_compute_bundle(
     *,
     gap: KnowledgeGap,
     results: list[PracticeResult],
+    student_context: str,
 ) -> PromptBundle:
     """Spacing hint from gap + chronological practice grades."""
 
-    system = _inject_student_context(_read_utf8(settings, "srs_compute_v1_system.txt"))
-    template = _read_utf8(settings, "srs_compute_v1_user.txt")
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("srs_compute_v1_system.txt")),
+        student_context=student_context,
+    )
+    template = _read_utf8(settings, _prompt_path("srs_compute_v1_user.txt"))
     history_json = json.dumps(
         [r.model_dump(mode="json") for r in results],
         ensure_ascii=False,
     )
     user = (
-        _inject_student_context(template)
+        _inject_student_context(template, student_context=student_context)
         .replace("{GAP_JSON}", gap.model_dump_json())
         .replace("{PRACTICE_HISTORY_JSON}", history_json)
     )
@@ -136,4 +206,30 @@ def build_srs_compute_bundle(
         system=system,
         user=user,
         prompt_versions={"srs_compute": "v1"},
+    )
+
+
+def build_onboard_assess_bundle(
+    settings: Settings,
+    *,
+    native_languages_json: str,
+    self_reported_level: str,
+    answers_json: str,
+    student_context: str,
+) -> PromptBundle:
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("onboard_assess_v1_system.txt")),
+        student_context=student_context,
+    )
+    template = _read_utf8(settings, _prompt_path("onboard_assess_v1_user.txt"))
+    user = (
+        _inject_student_context(template, student_context=student_context)
+        .replace("{NATIVE_LANGS_JSON}", native_languages_json)
+        .replace("{SELF_REPORTED_LEVEL}", self_reported_level.strip())
+        .replace("{ANSWERS_JSON}", answers_json)
+    )
+    return PromptBundle(
+        system=system,
+        user=user,
+        prompt_versions={"onboard_assess": "v1"},
     )
