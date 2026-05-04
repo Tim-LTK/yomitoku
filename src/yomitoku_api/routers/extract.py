@@ -1,5 +1,7 @@
 """HTTP router for OCR / handwriting extraction."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from yomitoku_api.config import Settings
@@ -9,6 +11,8 @@ from yomitoku_api.services import extract as extract_gen
 from yomitoku_api.services import prompts as prompt_service
 from yomitoku_api.services import validate as validate_service
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/extract", tags=["extract"])
 SettingsDep = Depends(get_settings_cached)
 
@@ -17,6 +21,11 @@ SettingsDep = Depends(get_settings_cached)
 def post_extract(body: ExtractRequest, settings: Settings = SettingsDep) -> ExtractResponse:
     student_context = prompt_service.resolve_request_student_context(body.student_context)
     bundle = prompt_service.build_scan_extract_bundle(settings, student_context=student_context)
+    b64_preview = body.image_base64[:100]
+    logger.info(
+        "extract.incoming_image",
+        extra={"image_base64_start": b64_preview, "media_type": body.media_type},
+    )
     raw = extract_gen.generate_text_from_image(
         settings,
         bundle,
