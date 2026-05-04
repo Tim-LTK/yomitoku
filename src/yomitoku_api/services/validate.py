@@ -15,6 +15,7 @@ from yomitoku_api.schemas import (
     PracticeGenerateEnvelope,
     PracticeItem,
     RawOutput,
+    ScanEnvelope,
     SentenceBreakdown,
     SrsComputeResponse,
     StudentProfile,
@@ -368,4 +369,51 @@ def validate_explain_generation(raw: RawOutput) -> ValidationResult:
         is_valid=True,
         issues=[],
         element_explanation=envelope.explanation,
+    )
+
+
+def validate_scan_generation(raw: RawOutput) -> ValidationResult:
+    """Parse targeted-scan JSON; `flaggedItems` must be a list (empty list allowed)."""
+
+    text = strip_code_fences(raw.raw_text)
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return ValidationResult(is_valid=False, issues=[issue_json_decode(exc)])
+
+    if not isinstance(payload, dict):
+        return ValidationResult(
+            is_valid=False,
+            issues=[
+                ValidationIssue(
+                    code="scan_root_not_object",
+                    message="Scan response must be a single JSON object.",
+                )
+            ],
+        )
+
+    flagged = payload.get("flaggedItems")
+    if not isinstance(flagged, list):
+        return ValidationResult(
+            is_valid=False,
+            issues=[
+                ValidationIssue(
+                    code="scan_flagged_items_not_list",
+                    message="`flaggedItems` must be a JSON array (empty array is allowed).",
+                )
+            ],
+        )
+
+    try:
+        envelope = ScanEnvelope.model_validate(payload)
+    except ValidationError as exc:
+        return ValidationResult(
+            is_valid=False,
+            issues=issue_pydantic_validation(exc),
+        )
+
+    return ValidationResult(
+        is_valid=True,
+        issues=[],
+        scan_result=envelope,
     )

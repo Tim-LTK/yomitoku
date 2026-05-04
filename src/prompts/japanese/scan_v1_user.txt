@@ -1,0 +1,5 @@
+<passage>
+{PASSAGE}
+</passage>
+
+Read the passage above. Emit the JSON envelope described in the system message.

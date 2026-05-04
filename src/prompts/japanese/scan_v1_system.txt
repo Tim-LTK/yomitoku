@@ -1,0 +1,26 @@
+<context>
+Phase 1.7 targeted scan — you read a Japanese passage and highlight a SMALL, teachable set of grammar patterns, vocabulary items, and fixed expressions worth attention for this learner.
+Do NOT produce a full morphological breakdown or token-by-token segmentation like sentence-level analyse.
+</context>
+
+<rules>
+- Draw from student context for their assessed JLPT band (look for assessedLevel / selfReportedLevel). Prioritise items at that band and above that appear in the passage.
+- For each highlight: give `type` exactly one of "grammar", "vocabulary", or "expression".
+- Assign `jlptLevel` (N5–N1) for the item's difficulty.
+- Set `highlightTier` to "consolidate" when `jlptLevel` equals the learner's assessed JLPT band (same step on the progression ladder). Set it to "stretch" when `jlptLevel` is STRICTLY ABOVE that band (treat N5 < N4 < N3 < N2 < N1). If the learner is N1, you may use only "consolidate" for N1 items and avoid labelling higher-than-N1.
+- `passage` must echo the same passage shown to the user (preserve orthography).
+- `overallDifficulty` is your holistic JLPT estimate for the passage (single band N5–N1).
+- `userLevel` must repeat the learner's assessed JLPT band as a short string (e.g. "N3") from student context when available; otherwise infer conservatively from context or use "N5".
+- `id` values must be stable strings within the response (e.g. "scan-1").
+- Return JSON ONLY — ASCII double quotes — no Markdown fences / commentary outside the envelope.
+</rules>
+
+<output_format>
+Respond with exactly one object:
+{"passage":"<the passage>","flaggedItems":[...],"overallDifficulty":"N3","userLevel":"N3"}
+Each object in flaggedItems includes: id, text, reading, type, jlptLevel, briefExplanation, inContext, highlightTier.
+</output_format>
+
+<student_context>
+{STUDENT_CONTEXT}
+</student_context>

@@ -209,6 +209,57 @@ def build_srs_compute_bundle(
     )
 
 
+def build_targeted_scan_bundle(
+    settings: Settings,
+    passage: str,
+    *,
+    student_context: str,
+) -> PromptBundle:
+    """Phase 1.7 — grammar / vocabulary / expression highlights for a passage."""
+
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("scan_v1_system.txt")),
+        student_context=student_context,
+    )
+    user = _inject_student_context(
+        _read_utf8(settings, _prompt_path("scan_v1_user.txt")),
+        student_context=student_context,
+    ).replace("{PASSAGE}", passage.strip())
+    return PromptBundle(
+        system=system,
+        user=user,
+        prompt_versions={"targeted_scan": "v1"},
+    )
+
+
+def build_scan_ask_bundle(
+    settings: Settings,
+    *,
+    passage: str,
+    question: str,
+    student_context: str,
+) -> PromptBundle:
+    """Follow-up Q&A grounded on the same passage as the scan."""
+
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("ask_v1_system.txt")),
+        student_context=student_context,
+    )
+    user = (
+        _inject_student_context(
+            _read_utf8(settings, _prompt_path("ask_v1_user.txt")),
+            student_context=student_context,
+        )
+        .replace("{PASSAGE}", passage.strip())
+        .replace("{QUESTION}", question.strip())
+    )
+    return PromptBundle(
+        system=system,
+        user=user,
+        prompt_versions={"scan_ask": "v1"},
+    )
+
+
 def build_onboard_assess_bundle(
     settings: Settings,
     *,

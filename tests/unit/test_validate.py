@@ -4,11 +4,15 @@ from yomitoku_api.schemas import RawOutput
 from yomitoku_api.services import validate as validate_service
 
 
-def _raw_with_json(payload: object) -> RawOutput:
+def _raw_with_json(
+    payload: object,
+    *,
+    prompt_versions: dict[str, str] | None = None,
+) -> RawOutput:
     return RawOutput(
         raw_text=json.dumps(payload, ensure_ascii=False),
         model_id="pytest",
-        prompt_versions={"breakdown_analysis": "v3"},
+        prompt_versions=prompt_versions or {"breakdown_analysis": "v3"},
     )
 
 
@@ -193,3 +197,30 @@ def test_validate_explain_accepts_envelope() -> None:
     assert result.is_valid
     assert result.element_explanation is not None
     assert result.element_explanation.headline.startswith("に")
+
+
+def test_validate_scan_accepts_empty_flagged_items() -> None:
+    payload = {
+        "passage": "今日は暑い。",
+        "flaggedItems": [],
+        "overallDifficulty": "N5",
+        "userLevel": "N5",
+    }
+    raw = _raw_with_json(payload, prompt_versions={"targeted_scan": "v1"})
+    result = validate_service.validate_scan_generation(raw)
+    assert result.is_valid
+    assert result.scan_result is not None
+    assert result.scan_result.flaggedItems == []
+
+
+def test_validate_scan_rejects_flagged_items_not_list() -> None:
+    payload = {
+        "passage": "今日は暑い。",
+        "flaggedItems": {"not": "a list"},
+        "overallDifficulty": "N5",
+        "userLevel": "N5",
+    }
+    raw = _raw_with_json(payload, prompt_versions={"targeted_scan": "v1"})
+    result = validate_service.validate_scan_generation(raw)
+    assert not result.is_valid
+    assert any(i.code == "scan_flagged_items_not_list" for i in result.issues)

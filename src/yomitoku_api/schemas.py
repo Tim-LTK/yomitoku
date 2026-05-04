@@ -31,6 +31,9 @@ GrammarRole = Literal[
 
 JlptBand = Literal["N5", "N4", "N3", "N2", "N1"]
 
+ScanItemType = Literal["grammar", "vocabulary", "expression"]
+HighlightTier = Literal["consolidate", "stretch"]
+
 
 class BreakdownElement(BaseModel):
     text: str
@@ -159,6 +162,55 @@ class AnalyseRequest(BaseModel):
 
 class AnalyseResponse(BaseModel):
     breakdowns: list[SentenceBreakdown]
+
+
+class FlaggedItem(BaseModel):
+    """Single highlighted learning target from a targeted reading scan."""
+
+    id: str
+    text: str
+    reading: str
+    type: ScanItemType
+    jlptLevel: JlptBand
+    briefExplanation: str
+    inContext: str
+    highlightTier: HighlightTier
+
+
+class ScanResult(BaseModel):
+    """Structured scan payload — same shape for model JSON, API body, and validation."""
+
+    passage: Annotated[str, Field(min_length=1)]
+    flaggedItems: list[FlaggedItem]
+    overallDifficulty: JlptBand
+    userLevel: str
+
+
+class ScanEnvelope(ScanResult):
+    """JSON object Claude returns for targeted scan (`POST /scan`)."""
+
+
+class ScanRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    text: Annotated[str, Field(min_length=1)]
+    student_context: str | None = Field(default=None, alias="studentContext")
+
+
+class ScanResponse(ScanResult):
+    """HTTP 200 body for `POST /scan`."""
+
+
+class AskRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    question: Annotated[str, Field(min_length=1)]
+    passage: Annotated[str, Field(min_length=1)]
+    student_context: str | None = Field(default=None, alias="studentContext")
+
+
+class AskResponse(BaseModel):
+    answer: str
 
 
 class HealthResponse(BaseModel):
@@ -307,6 +359,7 @@ class ValidationResult(BaseModel):
     element_explanation: ElementExplanation | None = None
     srs_compute: SrsComputeResponse | None = None
     student_profile: StudentProfile | None = None
+    scan_result: ScanResult | None = None
 
 
 class AnalyseEnvelope(BaseModel):

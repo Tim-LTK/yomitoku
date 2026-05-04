@@ -1,0 +1,9 @@
+<passage>
+{PASSAGE}
+</passage>
+
+<question>
+{QUESTION}
+</question>
+
+Answer the question with respect to this passage only.
