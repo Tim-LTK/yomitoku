@@ -1,6 +1,7 @@
 """Validation layer — discrete checks aggregated into `ValidationResult` objects."""
 
 import json
+import logging
 from datetime import datetime, timezone
 
 from pydantic import ValidationError
@@ -20,6 +21,8 @@ from yomitoku_api.schemas import (
     ValidationIssue,
     ValidationResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def strip_code_fences(raw: str) -> str:
@@ -89,7 +92,7 @@ def validate_original_sentence_non_empty(
 def validate_elements_non_empty_identity_fields(
     breakdowns: list[SentenceBreakdown],
 ) -> list[ValidationIssue]:
-    """Elements must expose surface form, reading, and gloss — Phase 1 table stakes."""
+    """Surface form and gloss must be non-empty; readings may be omitted (normalized later)."""
 
     issues: list[ValidationIssue] = []
     for si, bd in enumerate(breakdowns):
@@ -99,12 +102,32 @@ def validate_elements_non_empty_identity_fields(
     return issues
 
 
+def _normalize_breakdown_readings(breakdowns: list[SentenceBreakdown]) -> list[SentenceBreakdown]:
+    """Strip readings; empty / missing readings become \"\" and emit a log warning."""
+
+    normalized: list[SentenceBreakdown] = []
+    for si, bd in enumerate(breakdowns):
+        new_elements: list[BreakdownElement] = []
+        for ei, el in enumerate(bd.elements):
+            raw = el.reading if el.reading is not None else ""
+            stripped = raw.strip()
+            if stripped == "":
+                logger.warning(
+                    "breakdown element reading missing or whitespace-only: "
+                    "breakdowns[%s].elements[%s] text=%r — using empty reading",
+                    si,
+                    ei,
+                    el.text,
+                )
+            new_elements.append(el.model_copy(update={"reading": stripped}))
+        normalized.append(bd.model_copy(update={"elements": new_elements}))
+    return normalized
+
+
 def _element_nonempty_issues(prefix: str, el: BreakdownElement) -> list[ValidationIssue]:
     items: list[ValidationIssue] = []
     if not el.text.strip():
         items.append(ValidationIssue(code="element_text_empty", message=f"{prefix}.text"))
-    if not el.reading.strip():
-        items.append(ValidationIssue(code="element_reading_empty", message=f"{prefix}.reading"))
     if not el.meaning.strip():
         items.append(ValidationIssue(code="element_meaning_empty", message=f"{prefix}.meaning"))
     return items
@@ -183,10 +206,13 @@ def validate_breakdown_generation(raw: RawOutput) -> ValidationResult:
         issues.extend(collector(envelope.breakdowns))
 
     is_valid = len(issues) == 0
+    breakdowns_out = (
+        _normalize_breakdown_readings(envelope.breakdowns) if is_valid else None
+    )
     return ValidationResult(
         is_valid=is_valid,
         issues=issues,
-        breakdowns=envelope.breakdowns if is_valid else None,
+        breakdowns=breakdowns_out,
     )
 
 

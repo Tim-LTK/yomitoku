@@ -105,11 +105,15 @@ def run_chunked_sentence_breakdown_analysis(
     *,
     student_context: str,
 ) -> ValidationResult:
-    """Splits long input into sentence groups, validates each Claude reply, merges breakdowns."""
+    """Split input into sentence groups, validate each reply, merge valid breakdowns.
+
+    Invalid chunks are logged and omitted; callers only receive 422 when every chunk fails.
+    """
 
     chunks = chunk_japanese_text_for_analysis(japanese_text)
     merged: list[SentenceBreakdown] = []
     all_issues: list[ValidationIssue] = []
+    failed_chunks = 0
 
     logger.info(
         "analyse.chunked_plan",
@@ -126,26 +130,49 @@ def run_chunked_sentence_breakdown_analysis(
         validation = validate_service.validate_breakdown_generation(raw)
 
         if not validation.is_valid or validation.breakdowns is None:
-            all_issues.extend(
+            failed_chunks += 1
+            chunked_issues = [
                 ValidationIssue(
                     code=i.code,
                     message=f"chunk[{idx}]: {i.message}",
                 )
                 for i in validation.issues
+            ]
+            all_issues.extend(chunked_issues)
+            logger.warning(
+                "analyse.chunk_validation_failed",
+                extra={
+                    "chunk_index": idx,
+                    "issue_count": len(chunked_issues),
+                    "codes": [i.code for i in chunked_issues],
+                },
             )
             continue
 
         merged.extend(validation.breakdowns)
 
-    if all_issues:
+    if chunks and not merged:
         logger.info(
-            "analyse.chunked_validation_failure",
-            extra={"issue_count": len(all_issues)},
+            "analyse.chunked_validation_failure_all_chunks",
+            extra={
+                "issue_count": len(all_issues),
+                "chunk_count": len(chunks),
+            },
         )
         return ValidationResult(
             is_valid=False,
             issues=all_issues,
             breakdowns=None,
+        )
+
+    if merged and failed_chunks:
+        logger.info(
+            "analyse.chunked_partial_success",
+            extra={
+                "total_chunks": len(chunks),
+                "failed_chunks": failed_chunks,
+                "breakdown_sentence_count": len(merged),
+            },
         )
 
     return ValidationResult(is_valid=True, issues=[], breakdowns=merged)
