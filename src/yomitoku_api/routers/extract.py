@@ -21,11 +21,7 @@ SettingsDep = Depends(get_settings_cached)
 def post_extract(body: ExtractRequest, settings: Settings = SettingsDep) -> ExtractResponse:
     student_context = prompt_service.resolve_request_student_context(body.student_context)
     bundle = prompt_service.build_scan_extract_bundle(settings, student_context=student_context)
-    b64_preview = body.image_base64[:100]
-    logger.info(
-        "extract.incoming_image",
-        extra={"image_base64_start": b64_preview, "media_type": body.media_type},
-    )
+    logger.info(f"extract.incoming_image media_type={body.media_type} b64_start={body.image_base64[:50]}")
     raw = extract_gen.generate_text_from_image(
         settings,
         bundle,
