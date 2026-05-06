@@ -1,0 +1,3 @@
+Grade every row in submission order:
+
+{SUBMISSION_ROWS_JSON}

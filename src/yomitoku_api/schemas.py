@@ -90,16 +90,31 @@ PracticeErrorTag = Literal[
     "orthography",
     "listening",
     "other",
+    "unnatural_phrasing",
+    "wrong_register",
+]
+
+QuestionType = Literal[
+    "fill_blank",
+    "conjugate",
+    "translate",
+    "application_mc",
+    "nuance_choice",
 ]
 
 
 class PracticeItem(BaseModel):
-    """Single AI-generated drill question derived from SentenceBreakdown."""
+    """Single AI-generated drill question derived from SentenceBreakdown — Phase 2.1."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     itemId: Annotated[str, Field(min_length=1)]
-    practiceType: Annotated[str, Field(min_length=1)]
+    gapId: Annotated[str, Field(min_length=1)]
+    questionType: QuestionType
     prompt: Annotated[str, Field(min_length=1)]
     hint: str | None = None
+    options: list[str] | None = None
+    canonical_answer: str | None = Field(default=None, alias="canonicalAnswer")
 
 
 class PracticeResult(BaseModel):
@@ -110,12 +125,45 @@ class PracticeResult(BaseModel):
     errorTags: list[PracticeErrorTag]
 
 
-class PracticeGenerateRequest(BaseModel):
-    """Client sends one analysed sentence breakdown to spawn practice drills."""
+class KnowledgeGap(BaseModel):
+    """Learner-flagged weak spot — aligns with RN `KnowledgeGap`."""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    sentence_breakdown: SentenceBreakdown = Field(alias="sentenceBreakdown")
+    id: Annotated[str, Field(min_length=8)]
+    createdAtIso: Annotated[str, Field(min_length=1)]
+    breakdownRouteId: Annotated[str, Field(min_length=1)]
+    sentenceIndex: Annotated[int, Field(ge=0)]
+    sourceSentence: Annotated[str, Field(min_length=1)]
+    element: BreakdownElement
+    explanationSnapshot: ElementExplanation
+    nextReviewAt: str | None = None
+    intervalDays: Annotated[int | None, Field(default=None, ge=1, le=366)] = None
+    practiceResults: list[PracticeResult] | None = Field(default=None, alias="practiceResults")
+
+
+class KnowledgeGapPartial(BaseModel):
+    """Sparse PATCH merge for SRS gap rows."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    createdAtIso: str | None = None
+    breakdownRouteId: str | None = None
+    sentenceIndex: int | None = Field(None, ge=0)
+    sourceSentence: str | None = None
+    element: BreakdownElement | None = None
+    explanationSnapshot: ElementExplanation | None = None
+    nextReviewAt: str | None = None
+    intervalDays: Annotated[int | None, Field(default=None, ge=1, le=366)] = None
+    practiceResults: list[PracticeResult] | None = Field(default=None, alias="practiceResults")
+
+
+class PracticeGenerateRequest(BaseModel):
+    """Compose a practice session from learner gaps (Phase 2.1)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    gaps: Annotated[list[KnowledgeGap], Field(min_length=1)]
     student_context: str | None = Field(default=None, alias="studentContext")
 
 
@@ -123,19 +171,38 @@ class PracticeGenerateResponse(BaseModel):
     items: Annotated[list[PracticeItem], Field(min_length=1)]
 
 
-class PracticeEvaluateRequest(BaseModel):
-    """Learner submission for the same breakdown + item Claude generated."""
+class GapInterval(BaseModel):
+    """SRS spacing row for one gap after a session."""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    sentence_breakdown: SentenceBreakdown = Field(alias="sentenceBreakdown")
-    practice_item: PracticeItem = Field(alias="practiceItem")
-    user_answer: Annotated[str, Field(min_length=1, alias="userAnswer")]
-    student_context: str | None = Field(default=None, alias="studentContext")
+    gap_id: str = Field(alias="gapId")
+    interval_days: Annotated[int, Field(ge=1, le=366, alias="intervalDays")]
+    next_review_at: Annotated[str, Field(min_length=1, alias="nextReviewAt")]
 
 
-class PracticeEvaluateResponse(BaseModel):
-    result: PracticeResult
+class SessionItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    practice_item_id: Annotated[str, Field(min_length=1, alias="practiceItemId")]
+    user_answer: str = Field(alias="userAnswer")
+
+
+class SessionSubmission(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    gaps: Annotated[list[KnowledgeGap], Field(min_length=1)]
+    practice_items: Annotated[list[PracticeItem], Field(min_length=1, alias="practiceItems")]
+    items: Annotated[list[SessionItem], Field(min_length=1)]
+    student_context: str = Field(alias="studentContext")
+
+
+class SessionResult(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    results: list[PracticeResult]
+    tutor_notes: str = Field(alias="tutorNotes")
+    intervals: list[GapInterval]
 
 
 class ExtractRequest(BaseModel):
@@ -210,7 +277,12 @@ class AskRequest(BaseModel):
 
 
 class AskResponse(BaseModel):
-    answer: str
+    """Passage Q&A — optional structured highlight when the question targets a specific span."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    answer: Annotated[str, Field(min_length=1)]
+    suggested_flagged_item: FlaggedItem | None = Field(default=None, alias="suggestedFlaggedItem")
 
 
 class HealthResponse(BaseModel):
@@ -231,37 +303,6 @@ class RawOutput(BaseModel):
     raw_text: str
     model_id: str
     prompt_versions: dict[str, str]
-
-
-class KnowledgeGap(BaseModel):
-    """Learner-flagged weak spot — aligns with RN `KnowledgeGap`."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    id: Annotated[str, Field(min_length=8)]
-    createdAtIso: Annotated[str, Field(min_length=1)]
-    breakdownRouteId: Annotated[str, Field(min_length=1)]
-    sentenceIndex: Annotated[int, Field(ge=0)]
-    sourceSentence: Annotated[str, Field(min_length=1)]
-    element: BreakdownElement
-    explanationSnapshot: ElementExplanation
-    nextReviewAt: str | None = None
-    intervalDays: Annotated[int | None, Field(default=None, ge=1, le=366)] = None
-
-
-class KnowledgeGapPartial(BaseModel):
-    """Sparse PATCH merge for SRS gap rows."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    createdAtIso: str | None = None
-    breakdownRouteId: str | None = None
-    sentenceIndex: int | None = Field(None, ge=0)
-    sourceSentence: str | None = None
-    element: BreakdownElement | None = None
-    explanationSnapshot: ElementExplanation | None = None
-    nextReviewAt: str | None = None
-    intervalDays: Annotated[int | None, Field(default=None, ge=1, le=366)] = None
 
 
 class SrsComputeRequest(BaseModel):
@@ -343,6 +384,21 @@ class SrsComputeEnvelope(BaseModel):
     reasoning: Annotated[str, Field(min_length=1)]
 
 
+class PracticeGenerateEnvelope(BaseModel):
+    """JSON Claude must emit when minting drills."""
+
+    items: Annotated[list[PracticeItem], Field(min_length=1)]
+
+
+class PracticeSubmitEnvelope(BaseModel):
+    """Batch practice submit — Claude returns per-item results plus tutor notes."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    results: list[PracticeResult]
+    tutor_notes: Annotated[str, Field(min_length=1, alias="tutorNotes")]
+
+
 class ValidationIssue(BaseModel):
     code: str
     message: str
@@ -360,21 +416,11 @@ class ValidationResult(BaseModel):
     srs_compute: SrsComputeResponse | None = None
     student_profile: StudentProfile | None = None
     scan_result: ScanResult | None = None
+    ask_response: AskResponse | None = None
+    practice_submit_envelope: PracticeSubmitEnvelope | None = None
 
 
 class AnalyseEnvelope(BaseModel):
     """JSON envelope expected from breakdown generation."""
 
     breakdowns: list[SentenceBreakdown]
-
-
-class PracticeGenerateEnvelope(BaseModel):
-    """JSON Claude must emit when minting drills."""
-
-    items: Annotated[list[PracticeItem], Field(min_length=1)]
-
-
-class PracticeEvaluateEnvelope(BaseModel):
-    """JSON Claude returns when grading a submission."""
-
-    result: PracticeResult

@@ -129,29 +129,51 @@ def build_practice_generate_bundle(
     )
 
 
-def build_practice_evaluate_bundle(
+def build_practice_generate_tier2_bundle(
     settings: Settings,
     *,
-    breakdown: SentenceBreakdown,
-    practice_item: PracticeItem,
-    user_answer: str,
+    gap_specs_json: str,
     student_context: str,
 ) -> PromptBundle:
+    """Batch Tier 2 items for application_mc / nuance_choice."""
+
     system = _inject_student_context(
-        _read_utf8(settings, _prompt_path("practice_evaluate_v1_system.txt")),
+        _read_utf8(settings, _prompt_path("practice_generate_v2_system.txt")),
         student_context=student_context,
     )
-    user_template = _read_utf8(settings, _prompt_path("practice_evaluate_v1_user.txt"))
-    injections = (
-        _inject_student_context(user_template, student_context=student_context)
-        .replace("{SENTENCE_BREAKDOWN_JSON}", breakdown.model_dump_json())
-        .replace("{PRACTICE_ITEM_JSON}", practice_item.model_dump_json())
-        .replace("{USER_ANSWER}", user_answer.strip())
+    template = _read_utf8(settings, _prompt_path("practice_generate_v2_user.txt"))
+    user = (
+        _inject_student_context(template, student_context=student_context).replace(
+            "{GAP_SPECS_JSON}",
+            gap_specs_json,
+        )
     )
     return PromptBundle(
         system=system,
-        user=injections,
-        prompt_versions={"practice_evaluate": "v1"},
+        user=user,
+        prompt_versions={"practice_generate_tier2": "v2"},
+    )
+
+
+def build_practice_submit_bundle(
+    settings: Settings,
+    *,
+    submission_rows_json: str,
+    student_context: str,
+) -> PromptBundle:
+    system = _inject_student_context(
+        _read_utf8(settings, _prompt_path("practice_submit_v1_system.txt")),
+        student_context=student_context,
+    )
+    template = _read_utf8(settings, _prompt_path("practice_submit_v1_user.txt"))
+    user = _inject_student_context(template, student_context=student_context).replace(
+        "{SUBMISSION_ROWS_JSON}",
+        submission_rows_json,
+    )
+    return PromptBundle(
+        system=system,
+        user=user,
+        prompt_versions={"practice_submit": "v1"},
     )
 
 
@@ -242,12 +264,12 @@ def build_scan_ask_bundle(
     """Follow-up Q&A grounded on the same passage as the scan."""
 
     system = _inject_student_context(
-        _read_utf8(settings, _prompt_path("ask_v1_system.txt")),
+        _read_utf8(settings, _prompt_path("ask_v2_system.txt")),
         student_context=student_context,
     )
     user = (
         _inject_student_context(
-            _read_utf8(settings, _prompt_path("ask_v1_user.txt")),
+            _read_utf8(settings, _prompt_path("ask_v2_user.txt")),
             student_context=student_context,
         )
         .replace("{PASSAGE}", passage.strip())
@@ -256,7 +278,7 @@ def build_scan_ask_bundle(
     return PromptBundle(
         system=system,
         user=user,
-        prompt_versions={"scan_ask": "v1"},
+        prompt_versions={"scan_ask": "v2"},
     )
 
 

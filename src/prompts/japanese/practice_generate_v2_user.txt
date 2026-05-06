@@ -1,0 +1,5 @@
+Each entry below pairs one gap snapshot with target questionTypes in order:
+
+{GAP_SPECS_JSON}
+
+Emit `items[]` preserving order and cardinality.

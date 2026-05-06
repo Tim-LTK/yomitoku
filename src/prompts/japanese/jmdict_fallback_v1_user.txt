@@ -1,0 +1,3 @@
+What is the JLPT vocabulary level of this Japanese term?
+
+Term: {{term}}

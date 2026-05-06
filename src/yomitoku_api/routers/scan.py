@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from yomitoku_api.config import Settings
 from yomitoku_api.deps import get_settings_cached
-from yomitoku_api.exceptions import GenerationFailedError
 from yomitoku_api.schemas import AskRequest, AskResponse, ScanRequest, ScanResponse
+from yomitoku_api.services import ask as ask_gen
 from yomitoku_api.services import prompts as prompt_service
 from yomitoku_api.services import scan as scan_gen
 from yomitoku_api.services import validate as validate_service
@@ -57,8 +57,15 @@ def post_ask(body: AskRequest, settings: Settings = SettingsDep) -> AskResponse:
         question=body.question.strip(),
         student_context=student_context,
     )
-    raw = scan_gen.generate_ask_answer(settings, bundle)
-    answer = validate_service.strip_code_fences(raw.raw_text).strip()
-    if not answer:
-        raise GenerationFailedError()
-    return AskResponse(answer=answer)
+    raw = ask_gen.generate_ask_answer(settings, bundle)
+    validation = validate_service.validate_ask_generation(raw)
+    if not validation.is_valid or validation.ask_response is None:
+        logger.info(
+            "validation.failed.scan_ask",
+            extra={"issue_count": len(validation.issues)},
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=[issue.model_dump() for issue in validation.issues],
+        )
+    return validation.ask_response

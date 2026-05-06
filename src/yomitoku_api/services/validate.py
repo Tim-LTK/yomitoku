@@ -2,18 +2,20 @@
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import ValidationError
 
 from yomitoku_api.schemas import (
     AnalyseEnvelope,
+    AskResponse,
     BreakdownElement,
     ExplainEnvelope,
+    FlaggedItem,
     OnboardingAssessEnvelope,
-    PracticeEvaluateEnvelope,
     PracticeGenerateEnvelope,
     PracticeItem,
+    PracticeSubmitEnvelope,
     RawOutput,
     ScanEnvelope,
     SentenceBreakdown,
@@ -279,8 +281,8 @@ def validate_practice_generation(raw: RawOutput) -> ValidationResult:
     )
 
 
-def validate_practice_evaluation(raw: RawOutput) -> ValidationResult:
-    """Parse envelope wrapping `PracticeResult` for graded submissions."""
+def validate_session_submit_generation(raw: RawOutput, *, expected_count: int) -> ValidationResult:
+    """Parse batch practice submit JSON; length and tutor notes are contract-critical."""
 
     text = strip_code_fences(raw.raw_text)
     try:
@@ -289,18 +291,42 @@ def validate_practice_evaluation(raw: RawOutput) -> ValidationResult:
         return ValidationResult(is_valid=False, issues=[issue_json_decode(exc)])
 
     try:
-        envelope = PracticeEvaluateEnvelope.model_validate(payload)
+        envelope = PracticeSubmitEnvelope.model_validate(payload)
     except ValidationError as exc:
         return ValidationResult(
             is_valid=False,
             issues=issue_pydantic_validation(exc),
         )
 
-    return ValidationResult(is_valid=True, issues=[], practice_result=envelope.result)
+    issues: list[ValidationIssue] = []
+    if len(envelope.results) != expected_count:
+        issues.append(
+            ValidationIssue(
+                code="practice_submit_results_length",
+                message=(
+                    f"Expected {expected_count} practice result rows, "
+                    f"got {len(envelope.results)}."
+                ),
+            )
+        )
+    if not envelope.tutor_notes.strip():
+        issues.append(
+            ValidationIssue(
+                code="practice_submit_empty_tutor_notes",
+                message="`tutorNotes` must be a non-empty string.",
+            )
+        )
+
+    is_valid = len(issues) == 0
+    return ValidationResult(
+        is_valid=is_valid,
+        issues=issues,
+        practice_submit_envelope=envelope if is_valid else None,
+    )
 
 
 def _utc_assessment_stamp() -> str:
-    stamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    stamp = datetime.now(UTC).replace(microsecond=0).isoformat()
     return stamp.replace("+00:00", "Z")
 
 
@@ -416,4 +442,76 @@ def validate_scan_generation(raw: RawOutput) -> ValidationResult:
         is_valid=True,
         issues=[],
         scan_result=envelope,
+    )
+
+
+def validate_ask_generation(raw: RawOutput) -> ValidationResult:
+    """Parse ask JSON — `answer` required.
+
+    Invalid `suggestedFlaggedItem` is dropped with a warning.
+    """
+
+    text = strip_code_fences(raw.raw_text)
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return ValidationResult(is_valid=False, issues=[issue_json_decode(exc)])
+
+    if not isinstance(payload, dict):
+        return ValidationResult(
+            is_valid=False,
+            issues=[
+                ValidationIssue(
+                    code="ask_root_not_object",
+                    message="Ask response must be a single JSON object.",
+                )
+            ],
+        )
+
+    answer_raw = payload.get("answer")
+    if answer_raw is None:
+        return ValidationResult(
+            is_valid=False,
+            issues=[
+                ValidationIssue(
+                    code="ask_answer_missing",
+                    message="`answer` is required.",
+                )
+            ],
+        )
+    if not isinstance(answer_raw, str) or not answer_raw.strip():
+        return ValidationResult(
+            is_valid=False,
+            issues=[
+                ValidationIssue(
+                    code="ask_answer_empty",
+                    message="`answer` must be a non-empty string.",
+                )
+            ],
+        )
+
+    suggestion_raw = payload.get("suggestedFlaggedItem", payload.get("suggested_flagged_item"))
+    validated_flagged: FlaggedItem | None = None
+    if suggestion_raw is not None:
+        try:
+            validated_flagged = FlaggedItem.model_validate(suggestion_raw)
+        except ValidationError as exc:
+            logger.warning(
+                "ask.suggested_flagged_item_invalid",
+                extra={"errors": exc.errors()},
+            )
+
+    ask_response = AskResponse.model_validate(
+        {
+            "answer": answer_raw.strip(),
+            "suggestedFlaggedItem": (
+                validated_flagged.model_dump(mode="python") if validated_flagged else None
+            ),
+        }
+    )
+
+    return ValidationResult(
+        is_valid=True,
+        issues=[],
+        ask_response=ask_response,
     )

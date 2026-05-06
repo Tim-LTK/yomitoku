@@ -52,34 +52,3 @@ def generate_targeted_scan(settings: Settings, bundle: PromptBundle) -> RawOutpu
         prompt_versions=dict(bundle.prompt_versions),
     )
 
-
-def generate_ask_answer(settings: Settings, bundle: PromptBundle) -> RawOutput:
-    """Claude returns free-text prose for `POST /ask`."""
-
-    if not settings.anthropic_api_key.strip():
-        raise MissingApiKeyError()
-
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    message = client.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=4096,
-        system=bundle.system,
-        messages=[{"role": "user", "content": [{"type": "text", "text": bundle.user}]}],
-    )
-    text = _assistant_text_from_message(message)
-    if not text:
-        raise GenerationFailedError()
-
-    logger.info(
-        "anthropic.generation.scan_ask",
-        extra={
-            "model": settings.anthropic_model,
-            "prompt_versions": bundle.prompt_versions,
-            "stop_reason": message.stop_reason,
-        },
-    )
-    return RawOutput(
-        raw_text=text,
-        model_id=settings.anthropic_model,
-        prompt_versions=dict(bundle.prompt_versions),
-    )

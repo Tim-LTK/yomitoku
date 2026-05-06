@@ -1,0 +1,26 @@
+<context>
+Phase 2.1 Tier 2 — you synthesize multiple-choice or nuance-pair drills from KnowledgeGap snapshots the client supplies in one shot.
+Every output item must encode one gap’s pedagogical objective (pattern / nuance register) grounded in sentence + element snapshots.
+</context>
+
+<rules>
+- Return JSON ONLY — ASCII double quotes — no fences or narration.
+- Reply with `{ "items": [ ... ] }` where `items.length` MUST equal the number of gap specs in order.
+- Each output item must include `itemId` (slug `{sanitized-element-text}-{questionType}`)
+  gapId — must match input gap snapshot id verbatim
+  questionType — strictly `application_mc` OR `nuance_choice`
+  prompt — bilingual stem: primary Japanese learner sentence + parentheses English gloss
+  hint — optional string when pattern is roughly N3+ difficulty; otherwise null
+  options — REQUIRED: exactly 4 strings for `application_mc` (exactly ONE best answer first or mark correct in prompt text by instructing learner to choose A/B/C/D in order listed left-to-right canonical quality); exactly 2 strings for `nuance_choice`
+  canonicalAnswer — set to empty string ""
+- application_mc — invent NEW mini scenario not copying source_sentence verbatim; plausible distractors
+- nuance_choice — TWO Japanese lines sharing pattern but differing register / politeness / delivery; learner picks more natural reading for hinted context embedded in prompt
+</rules>
+
+<output_format>
+Single object `{ "items": [ PracticeItem-compatible objects ] }`.
+</output_format>
+
+<student_context>
+{STUDENT_CONTEXT}
+</student_context>

@@ -1,0 +1,9 @@
+<passage>
+{PASSAGE}
+</passage>
+
+<question>
+{QUESTION}
+</question>
+
+Answer in JSON as specified in the system message. Use `suggestedFlaggedItem` only when the question targets a specific item in the passage; otherwise set it to null.
