@@ -240,17 +240,17 @@ def build_targeted_scan_bundle(
     """Phase 1.7 — grammar / vocabulary / expression highlights for a passage."""
 
     system = _inject_student_context(
-        _read_utf8(settings, _prompt_path("scan_v1_system.txt")),
+        _read_utf8(settings, _prompt_path("scan_v2_system.txt")),
         student_context=student_context,
     )
     user = _inject_student_context(
-        _read_utf8(settings, _prompt_path("scan_v1_user.txt")),
+        _read_utf8(settings, _prompt_path("scan_v2_user.txt")),
         student_context=student_context,
     ).replace("{PASSAGE}", passage.strip())
     return PromptBundle(
         system=system,
         user=user,
-        prompt_versions={"targeted_scan": "v1"},
+        prompt_versions={"targeted_scan": "v2"},
     )
 
 

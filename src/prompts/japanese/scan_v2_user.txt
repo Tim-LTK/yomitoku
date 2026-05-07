@@ -1,0 +1,6 @@
+<passage>
+{PASSAGE}
+</passage>
+
+Read the passage above. Using your knowledge of JLPT levels, flag every vocabulary item, grammar pattern, and expression at or above the learner's assessed level. Do not self-limit — if it belongs at their level or above, include it. Maximum 30 items; if cutting is needed, drop items already in the learner's known grammar list first.
+Emit the JSON envelope described in the system message.
